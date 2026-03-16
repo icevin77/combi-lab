@@ -928,6 +928,12 @@ List up to 3 papers. If you cannot find a real PMID, write PMID: NOT_FOUND. Do N
         });
         const d1 = await r1.json();
 
+        // API 에러면 이 검색은 건너뜀
+        if (d1.error || !d1.content) {
+          console.warn('Search API error:', d1.error || 'no content');
+          continue;
+        }
+
         // collect all text blocks (including tool_result content)
         let allText = '';
         for (const block of (d1.content || [])) {
@@ -1019,6 +1025,15 @@ RULES: Korean for all user text except protein/drug/journal names. 4-6 marker ca
     });
 
     const data = await response.json();
+
+    // API 에러 체크 (401, 429, 500 등)
+    if (data.error) {
+      throw new Error('Anthropic API 오류: ' + (data.error.message || JSON.stringify(data.error)));
+    }
+    if (!data.content || !Array.isArray(data.content)) {
+      throw new Error('API 응답 형식 오류: ' + JSON.stringify(data).substring(0, 200));
+    }
+
     const rawText = data.content.map(b => b.text || '').join('');
 
     let parsed;
