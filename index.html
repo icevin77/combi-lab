@@ -877,30 +877,113 @@ async function runAnalysis() {
   const prompt = buildPrompt(drugA, drugB, cellLine, purpose, ic50Info, notes);
 
   try {
-    // ── 단일 API 호출: 분석 + 논문 목록 동시 생성 ──
-    // (web_search는 Claude.ai 전용 — 외부 배포에서는 학습 데이터 기반으로 논문 추천)
+    // ── STEP 1: 실제 웹 검색으로 논문 수집 (tool_use 결과에서 직접 파싱) ──
+    const searchQueries = [
+      `pubmed ${drugA} cancer mechanism site:pubmed.ncbi.nlm.nih.gov`,
+      `pubmed ${drugB} ${cellLine} OR melanoma synergy site:pubmed.ncbi.nlm.nih.gov`,
+      `pubmed ${drugA} ${drugB} combination cancer site:pubmed.ncbi.nlm.nih.gov`
+    ];
+
+    // realCitations: 검색 결과에서 직접 추출한 논문만 저장
     let realCitations = [];
+    let searchContext = '';
 
-    // 로딩 스텝 한번에 진행
-    ['step1','step2','step3'].forEach((id, i) => {
-      setTimeout(() => {
-        const el = document.getElementById(id);
-        if (el) { el.classList.remove('active'); el.classList.add('done'); el.querySelector('.step-icon').textContent = '✓'; }
-        if (i === 2) document.getElementById('step4')?.classList.add('active');
-      }, (i+1) * 1500);
+    for (let qi = 0; qi < searchQueries.length; qi++) {
+      const q = searchQueries[qi];
+      // advance loading step visually
+      [1,2,3].forEach(i => {
+        const el = document.getElementById('step' + i);
+        if (el) {
+          el.classList.remove('active');
+          if (i < qi + 1) { el.classList.add('done'); el.querySelector('.step-icon').textContent = '✓'; }
+          if (i === qi + 1) el.classList.add('active');
+        }
+      });
+
+      try {
+        const r1 = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 2000,
+            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+            system: 'You are a biomedical literature retrieval assistant. Search and extract REAL paper information only. Never fabricate.',
+            messages: [{
+              role: 'user',
+              content: `Search PubMed for papers about: ${drugA}, ${drugB}, ${cellLine} cancer.
+
+For each paper found, extract EXACTLY:
+TITLE: [exact title]
+AUTHORS: [authors]
+JOURNAL: [journal name]
+YEAR: [year]
+PMID: [numeric PMID]
+ABSTRACT_SNIPPET: [1-2 sentence summary]
+URL: [pubmed URL]
+
+List up to 3 papers. If you cannot find a real PMID, write PMID: NOT_FOUND. Do NOT invent PMIDs.`
+            }]
+          })
+        });
+        const d1 = await r1.json();
+
+        // collect all text blocks (including tool_result content)
+        let allText = '';
+        for (const block of (d1.content || [])) {
+          if (block.type === 'text') allText += block.text + '\n';
+          if (block.type === 'tool_result') allText += JSON.stringify(block.content) + '\n';
+        }
+        if (allText) searchContext += `\n[Search ${qi+1}: ${drugA}/${drugB}/${cellLine}]\n` + allText;
+
+        // parse structured citations from the text
+        const titleMatches = [...allText.matchAll(/TITLE:\s*(.+)/g)];
+        const authorMatches = [...allText.matchAll(/AUTHORS:\s*(.+)/g)];
+        const journalMatches = [...allText.matchAll(/JOURNAL:\s*(.+)/g)];
+        const yearMatches = [...allText.matchAll(/YEAR:\s*(\d{4})/g)];
+        const pmidMatches = [...allText.matchAll(/PMID:\s*(\d{5,9})/g)];
+        const snippetMatches = [...allText.matchAll(/ABSTRACT_SNIPPET:\s*(.+)/g)];
+
+        for (let i = 0; i < titleMatches.length; i++) {
+          const pmid = pmidMatches[i]?.[1] || null;
+          const title = titleMatches[i]?.[1]?.trim();
+          if (!title || title.length < 10) continue;
+          // dedup by title
+          if (realCitations.some(c => c.title === title)) continue;
+          realCitations.push({
+            title: title,
+            authors: authorMatches[i]?.[1]?.trim() || '',
+            journal: journalMatches[i]?.[1]?.trim() || '',
+            year: yearMatches[i]?.[1]?.trim() || '',
+            pubmed_id: pmid,
+            snippet: snippetMatches[i]?.[1]?.trim() || '',
+            relevance: ''  // will be filled by analysis step
+          });
+        }
+      } catch(e) {
+        console.warn('Search query failed:', q, e);
+      }
+    }
+
+    // step 3 done, step 4 active
+    ['step1','step2','step3'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.classList.remove('active'); el.classList.add('done'); el.querySelector('.step-icon').textContent = '✓'; }
     });
+    document.getElementById('step4')?.classList.add('active');
 
+    // ── STEP 2: 분석 JSON 생성 — citations 필드 제거, 대신 realCitations 직접 주입 ──
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 5000,
-        system: `You are an expert oncology pharmacologist with deep knowledge of published literature. ABSOLUTE RULE: output ONLY a raw JSON object. NO backticks, NO markdown, NO code fences. Start with { end with }.
+        system: `You are an expert oncology pharmacologist. ABSOLUTE RULE: output ONLY a raw JSON object. NO backticks, NO markdown, NO code fences. Start with { end with }.
 
-Output this exact JSON schema:
+Output this JSON schema (NO citations field - citations are handled separately):
 {
-  "verdict": {"prediction": "SYNERGY"|"ADDITIVE"|"ANTAGONISM"|"UNCERTAIN", "confidence": 0-100, "score_label": "Korean short label", "summary": "Korean 2-3 sentences"},
+  "verdict": {"prediction": "SYNERGY"|"ADDITIVE"|"ANTAGONISM"|"UNCERTAIN", "confidence": 0-100, "score_label": "Korean", "summary": "Korean 2-3 sentences"},
   "mechanism": {
     "pathway_steps": [{"node": "name", "type": "a"|"b"|"effect"|"neutral", "arrow": "→"}],
     "key_interaction": "Korean one sentence"
@@ -917,40 +1000,27 @@ Output this exact JSON schema:
       {"label": "Sub-IC50", "value": "X nM", "note": "Korean", "badge": "low"}
     ]
   },
-  "timeline": [{"time": "0 h", "action": "Korean", "desc": "Korean", "type": "normal"|"key"}],
+  "timeline": [
+    {"time": "0 h", "action": "Korean", "desc": "Korean", "type": "normal"|"key"}
+  ],
   "markers": [
-    {"category": "Korean category", "items": [
+    {"category": "Korean", "items": [
       {"name": "γH2AX (pS139)", "kda": "15", "direction": "up"|"down"|"same", "change_desc": "Korean", "confidence": "high"|"medium"|"low", "priority": 1}
     ]}
   ],
   "rationale": "Korean 3-4 sentences",
-  "citations": [
-    {"title": "EXACT real paper title from published literature", "journal": "Journal Name", "year": "YYYY", "authors": "First Author et al.", "pubmed_id": "numeric PMID or null if uncertain", "relevance": "Korean one sentence"}
-  ],
+  "citation_relevances": ["Korean relevance for citation 0", "Korean relevance for citation 1"],
   "caveats": [{"type": "warn"|"info", "text": "Korean"}]
 }
 
-CRITICAL CITATION RULES:
-- Only include papers you are HIGHLY CONFIDENT exist in published literature
-- Use exact titles — do NOT paraphrase or invent titles
-- If you are not sure of the exact title or PMID, set pubmed_id to null
-- Include 3-6 real citations minimum
-- Korean for all user-visible text except protein/drug/journal names
-- 4-6 marker categories, 2-4 markers each, 5-7 timeline points, 3 doses per drug`,
-        messages: [{ role: 'user', content: prompt }]
+RULES: Korean for all user text except protein/drug/journal names. 4-6 marker categories. 5-7 timeline points. 3 doses per drug. citation_relevances array must match number of search results provided.`,
+        messages: [{ role: 'user', content: prompt + (searchContext ? `\n\n=== SEARCH CONTEXT (for mechanism/rationale only) ===\n${searchContext.substring(0, 3000)}` : '') + `\n\nFound ${realCitations.length} real papers from search. Provide citation_relevances array with ${realCitations.length} Korean strings explaining why each paper is relevant.` }]
       })
     });
 
     const data = await response.json();
-
-    // API 에러 체크 (401, 429, 500 등)
-    if (data.error) {
-      throw new Error('Anthropic API 오류: ' + (data.error.message || JSON.stringify(data.error)));
-    }
-    if (!data.content || !Array.isArray(data.content)) {
-      throw new Error('API 응답 형식 오류: ' + JSON.stringify(data).substring(0, 200));
-    }
-
+    if (data.error) throw new Error('API 오류: ' + (data.error.message || JSON.stringify(data.error)));
+    if (!data.content || !Array.isArray(data.content)) throw new Error('응답 형식 오류: ' + JSON.stringify(data).substring(0, 200));
     const rawText = data.content.map(b => b.text || '').join('');
 
     let parsed;
@@ -1002,8 +1072,14 @@ CRITICAL CITATION RULES:
     document.getElementById('step4').classList.add('done');
     document.getElementById('step4').querySelector('.step-icon').textContent = '✓';
 
-    // citations는 API가 직접 반환한 값 사용 (없으면 빈 배열)
-    parsed.citations = parsed.citations || [];
+    // ── 검색으로 확인된 실제 논문에만 relevance 텍스트 붙여서 주입 ──
+    const relevances = parsed.citation_relevances || [];
+    realCitations = realCitations.map((c, i) => ({
+      ...c,
+      relevance: relevances[i] || '관련 연구'
+    }));
+    // citations는 반드시 검색에서 실제로 찾아진 것만 — 없으면 빈 배열
+    parsed.citations = realCitations;
 
     setTimeout(() => {
       document.getElementById('loadingPanel').classList.remove('show');
