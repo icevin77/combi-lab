@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COMBI-LAB — Drug Combination Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #06080d;
+    --surface: #0d1117;
+    --surface2: #141920;
+    --surface3: #1c2330;
+    --border: #1e2736;
+    --border2: #263044;
+    --cyan: #00d9c0;
+    --amber: #f5a623;
+    --rose: #ff4d6d;
+    --blue: #4895ef;
+    --green: #52b788;
+    --text: #dde3ee;
+    --text2: #7d8fa8;
+    --text3: #3d4f63;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'Fira Code', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* animated bg grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 10% 20%, rgba(0,217,192,0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 90% 80%, rgba(72,149,239,0.04) 0%, transparent 60%),
+      linear-gradient(rgba(0,217,192,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,217,192,0.02) 1px, transparent 1px);
+    background-size: auto, auto, 48px 48px, 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .brand-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--cyan), var(--blue));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 800;
+    color: #000;
+  }
+  .brand-name {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .brand-name span { color: var(--cyan); }
+  .header-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ── MAIN ── */
+  .main {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    text-align: center;
+    padding: 40px 0 48px;
+  }
+  .hero-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    padding: 5px 14px;
+    border: 1px solid rgba(0,217,192,0.25);
+    border-radius: 20px;
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -2px;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(90deg, var(--cyan), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero p {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.7;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  /* ── INPUT FORM ── */
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 36px;
+    margin-bottom: 32px;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .field-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .field-label .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-a { background: var(--cyan); }
+  .dot-b { background: var(--amber); }
+  .dot-c { background: var(--blue); }
+
+  input[type="text"], select, textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 12px 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+  }
+  input[type="text"]:focus, select:focus, textarea:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(0,217,192,0.08);
+  }
+  input::placeholder { color: var(--text3); }
+  select option { background: var(--surface2); }
+
+  .input-hint {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+
+  /* advanced options */
+  .advanced-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 10px 0;
+    user-select: none;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+  .advanced-toggle:hover { color: var(--cyan); }
+  .advanced-content { display: none; }
+  .advanced-content.open { display: block; }
+
+  .adv-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    padding-top: 20px;
+  }
+
+  /* run button */
+  .btn-run {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--cyan), var(--blue));
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .btn-run:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,217,192,0.2); }
+  .btn-run:disabled { background: var(--border2); color: var(--text3); cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-run svg { width: 18px; height: 18px; }
+
+  /* ── LOADING ── */
+  .loading-panel {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 48px 36px;
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .loading-panel.show { display: block; }
+  .loading-steps { display: flex; flex-direction: column; gap: 12px; max-width: 400px; margin: 24px auto 0; }
+  .loading-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text3);
+    text-align: left;
+    transition: color 0.3s;
+  }
+  .loading-step.active { color: var(--cyan); }
+  .loading-step.done { color: var(--green); }
+  .step-icon {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+  }
+  .loading-step.active .step-icon {
+    border-color: var(--cyan);
+    animation: pulse-ring 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse-ring {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0,217,192,0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(0,217,192,0); }
+  }
+
+  /* spinner */
+  .spinner-wrap { display: flex; justify-content: center; }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--cyan);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── RESULTS ── */
+  #results { display: none; }
+  #results.show { display: block; }
+
+  /* verdict banner */
+  .verdict-banner {
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    border: 1px solid;
+    animation: fadeSlideIn 0.5s ease;
+  }
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .verdict-banner.synergy { background: rgba(0,217,192,0.05); border-color: rgba(0,217,192,0.2); }
+  .verdict-banner.additive { background: rgba(245,166,35,0.05); border-color: rgba(245,166,35,0.2); }
+  .verdict-banner.antagonism { background: rgba(255,77,109,0.05); border-color: rgba(255,77,109,0.2); }
+  .verdict-banner.uncertain { background: rgba(125,143,168,0.05); border-color: rgba(125,143,168,0.2); }
+
+  .verdict-score-ring {
+    position: relative;
+    width: 80px; height: 80px;
+    flex-shrink: 0;
+  }
+  .verdict-score-ring svg { transform: rotate(-90deg); }
+  .verdict-score-ring .score-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 800;
+    transform: none;
+  }
+  .verdict-info { flex: 1; }
+  .verdict-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .verdict-title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  .verdict-sub {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.6;
+  }
+
+  /* section headers */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .section-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text3);
+    width: 24px;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text2);
+  }
+
+  /* results grid */
+  .results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+    animation: fadeSlideIn 0.5s ease 0.1s both;
+  }
+  .results-grid.full { grid-template-columns: 1fr; }
+
+  .res-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .res-card-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .res-card-title .tag-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--cyan);
+  }
+  .res-card-title .tag-dot.amber { background: var(--amber); }
+  .res-card-title .tag-dot.rose { background: var(--rose); }
+
+  /* dose table */
+  .dose-table { width: 100%; border-collapse: collapse; }
+  .dose-table th {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .dose-table td {
+    padding: 10px 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border-bottom: 1px solid rgba(30,39,54,0.5);
+    vertical-align: top;
+  }
+  .dose-table tr:last-child td { border-bottom: none; }
+  .dose-table tr:hover td { background: rgba(255,255,255,0.01); }
+
+  .dose-val {
+    font-weight: 500;
+    color: var(--cyan);
+  }
+  .dose-note {
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 3px;
+    font-weight: 300;
+  }
+  .dose-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .badge-primary { background: rgba(0,217,192,0.12); color: var(--cyan); }
+  .badge-test { background: rgba(72,149,239,0.12); color: var(--blue); }
+  .badge-low { background: rgba(245,166,35,0.12); color: var(--amber); }
+
+  /* timeline */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-item {
+    display: flex;
+    gap: 16px;
+    padding-bottom: 20px;
+    position: relative;
+  }
+  .tl-item:last-child { padding-bottom: 0; }
+  .tl-item:last-child .tl-line { display: none; }
+  .tl-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    width: 20px;
+  }
+  .tl-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--border2);
+    border: 2px solid var(--border2);
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+  .tl-dot.active { background: var(--cyan); border-color: var(--cyan); }
+  .tl-dot.key { background: var(--amber); border-color: var(--amber); }
+  .tl-line {
+    flex: 1;
+    width: 1px;
+    background: var(--border);
+    margin-top: 4px;
+  }
+  .tl-time {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--cyan);
+    font-weight: 500;
+    white-space: nowrap;
+    min-width: 56px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .tl-body { flex: 1; }
+  .tl-action {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+  .tl-desc {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  /* markers */
+  .marker-list { display: flex; flex-direction: column; gap: 6px; }
+  .marker-row {
+    display: grid;
+    grid-template-columns: 120px 60px 1fr 50px;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 10px;
+    background: var(--surface2);
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: border-color 0.15s;
+  }
+  .marker-row:hover { border-color: var(--border2); }
+  .marker-name {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .marker-kda {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text3);
+  }
+  .marker-change {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .change-arrow {
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .arrow-up { color: var(--cyan); }
+  .arrow-down { color: var(--rose); }
+  .arrow-same { color: var(--text3); }
+  .change-text {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text2);
+    line-height: 1.4;
+  }
+  .marker-conf {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-align: right;
+  }
+  .conf-h { color: var(--green); }
+  .conf-m { color: var(--amber); }
+  .conf-l { color: var(--text3); }
+
+  .marker-category {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 12px 10px 4px;
+  }
+
+  /* mechanism pathway */
+  .pathway-text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--text2);
+  }
+  .pathway-text .node {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .node-a { background: rgba(0,217,192,0.12); color: var(--cyan); }
+  .node-b { background: rgba(245,166,35,0.12); color: var(--amber); }
+  .node-effect { background: rgba(255,77,109,0.12); color: var(--rose); }
+  .node-neutral { background: rgba(72,149,239,0.12); color: var(--blue); }
+  .arrow-flow { color: var(--text3); margin: 0 4px; }
+
+  /* citations */
+  .citations { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .cite-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-radius: 6px;
+    border-left: 2px solid var(--border2);
+  }
+  .cite-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--cyan);
+    flex-shrink: 0;
+    width: 20px;
+    margin-top: 1px;
+  }
+  .cite-body { flex: 1; }
+  .cite-title {
+    font-size: 12px;
+    color: var(--text);
+    margin-bottom: 2px;
+    line-height: 1.4;
+  }
+  .cite-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text3);
+  }
+  .cite-link {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--blue);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 2px;
+  }
+  .cite-link:hover { text-decoration: underline; }
+
+  /* caveats */
+  .caveat-list { display: flex; flex-direction: column; gap: 8px; }
+  .caveat-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text2);
+  }
+  .caveat-item.warn { background: rgba(245,166,35,0.06); border: 1px solid rgba(245,166,35,0.12); }
+  .caveat-item.info { background: rgba(72,149,239,0.06); border: 1px solid rgba(72,149,239,0.12); }
+  .caveat-icon { flex-shrink: 0; }
+
+  /* error state */
+  .error-panel {
+    display: none;
+    background: rgba(255,77,109,0.05);
+    border: 1px solid rgba(255,77,109,0.15);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .error-panel.show { display: block; }
+  .error-panel p {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--rose);
+    margin-top: 8px;
+  }
+
+  /* animation delays */
+  .res-card:nth-child(1) { animation-delay: 0.05s; }
+  .res-card:nth-child(2) { animation-delay: 0.10s; }
+
+
+  
+
+  @media (max-width: 768px) {
+    .main { padding: 20px; }
+    .form-grid, .adv-grid, .results-grid { grid-template-columns: 1fr; }
+    header { padding: 16px 20px; }
+    .marker-row { grid-template-columns: 100px 50px 1fr; }
+    .marker-conf { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-icon">CL</div>
+    <div>
+      <div class="brand-name">COMBI<span>-LAB</span></div>
+    </div>
+  </div>
+  <div class="header-tag">Drug Combination Predictor · AI-Powered</div>
+</header>
+
+<div class="main">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-tag">⚗ Preclinical Analysis Tool</div>
+    <h1>약물 조합 효과<br><em>자동 예측 시스템</em></h1>
+    <p>약물 A + 약물 B + 암세포주를 입력하면<br>
+    최적 농도 범위 · 처리 시간 · WB 마커를 논문 기반으로 예측합니다</p>
+  </div>
+
+  <!-- FORM -->
+  <div class="form-card">
+    <div class="form-grid">
+      <div class="field-group">
+        <label class="field-label">
+          <span class="dot dot-a"></span>약물 A
+        </label>
+        <input type="text" id="drugA" placeholder="e.g. IRP2 inhibitor (KS-20226)" />
+        <div class="input-hint">// 일반명 또는 성분명</div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">
+          <span class="dot dot-b"></span>약물 B
+        </label>
+        <input type="text" id="drugB" placeholder="e.g. CHK1 inhibitor (MK-8776)" />
+        <div class="input-hint">// 일반명 또는 성분명</div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">
+          <span class="dot dot-c"></span>암세포주
+        </label>
+        <input type="text" id="cellLine" placeholder="e.g. RPMI-7951" />
+        <div class="input-hint">// ATCC 명칭 권장</div>
+      </div>
+    </div>
+
+    <!-- Advanced toggle -->
+    <div class="advanced-toggle" onclick="toggleAdvanced()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 20V10M18 20V4M6 20v-4"/>
+      </svg>
+      추가 정보 입력 (선택) — 정확도 향상
+      <svg id="adv-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:auto; transition:transform 0.2s">
+        <path d="M6 9l6 6 6-6"/>
+      </svg>
+    </div>
+    <div class="advanced-content" id="advContent">
+      <div class="adv-grid">
+        <div class="field-group">
+          <label class="field-label">실험 목적</label>
+          <select id="purpose">
+            <option value="synergy_check">시너지 확인 (초기 탐색)</option>
+            <option value="mechanism">기전 규명</option>
+            <option value="dose_optimization">농도 최적화</option>
+            <option value="resistance">내성 극복</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">기존 IC50 정보</label>
+          <input type="text" id="ic50Info" placeholder="e.g. Drug A: 1μM, Drug B: 500nM" />
+          <div class="input-hint">// 알고 있는 경우만</div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">특이사항</label>
+          <input type="text" id="notes" placeholder="e.g. BRAFi 내성, p53 null" />
+          <div class="input-hint">// 세포주 특이 정보</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-run" id="runBtn" onclick="runAnalysis()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+      </svg>
+      분석 시작 — AI 논문 검색 & 예측
+    </button>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading-panel" id="loadingPanel">
+    <div class="spinner-wrap"><div class="spinner"></div></div>
+    <div style="margin-top:20px; font-size:15px; font-weight:600; color:var(--text)">분석 중...</div>
+    <div class="loading-steps" id="loadingSteps">
+      <div class="loading-step active" id="step1">
+        <div class="step-icon">1</div>
+        <span>PubMed 논문 검색 중 (약물 A + 세포주)</span>
+      </div>
+      <div class="loading-step" id="step2">
+        <div class="step-icon">2</div>
+        <span>PubMed 논문 검색 중 (약물 B + 시너지)</span>
+      </div>
+      <div class="loading-step" id="step3">
+        <div class="step-icon">3</div>
+        <span>PubMed 논문 검색 중 (A+B 조합)</span>
+      </div>
+      <div class="loading-step" id="step4">
+        <div class="step-icon">4</div>
+        <span>논문 기반 시너지 기전 · 농도 · 마커 분석</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-panel" id="errorPanel">
+    <div style="font-size:28px">⚠</div>
+    <p id="errorMsg">분석 중 오류가 발생했습니다. 다시 시도해주세요.</p>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results"></div>
+
+</div>
+
+<script>
+let advOpen = false;
+
+function toggleAdvanced() {
+  advOpen = !advOpen;
+  document.getElementById('advContent').classList.toggle('open', advOpen);
+  document.getElementById('adv-chevron').style.transform = advOpen ? 'rotate(180deg)' : '';
+}
+
+async function runAnalysis() {
+  const drugA = document.getElementById('drugA').value.trim();
+  const drugB = document.getElementById('drugB').value.trim();
+  const cellLine = document.getElementById('cellLine').value.trim();
+
+  if (!drugA || !drugB || !cellLine) {
+    alert('약물 A, 약물 B, 세포주를 모두 입력해주세요.');
+    return;
+  }
+
+  const purpose = document.getElementById('purpose').value;
+  const ic50Info = document.getElementById('ic50Info').value.trim();
+  const notes = document.getElementById('notes').value.trim();
+
+  // UI state
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('loadingPanel').classList.add('show');
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('errorPanel').classList.remove('show');
+
+  // animate loading steps
+  const stepDelays = [0, 5000, 10000, 15000];
+  stepDelays.forEach((delay, i) => {
+    setTimeout(() => {
+      if (i > 0) {
+        document.getElementById(`step${i}`).classList.remove('active');
+        document.getElementById(`step${i}`).classList.add('done');
+        document.getElementById(`step${i}`).querySelector('.step-icon').textContent = '✓';
+      }
+      if (i < 4) {
+        document.getElementById(`step${i + 1}`)?.classList.add('active');
+      }
+    }, delay);
+  });
+
+  const prompt = buildPrompt(drugA, drugB, cellLine, purpose, ic50Info, notes);
+
+  try {
+    // ── STEP 1: 실제 웹 검색으로 논문 수집 (tool_use 결과에서 직접 파싱) ──
+    const searchQueries = [
+      `pubmed ${drugA} cancer mechanism site:pubmed.ncbi.nlm.nih.gov`,
+      `pubmed ${drugB} ${cellLine} OR melanoma synergy site:pubmed.ncbi.nlm.nih.gov`,
+      `pubmed ${drugA} ${drugB} combination cancer site:pubmed.ncbi.nlm.nih.gov`
+    ];
+
+    // realCitations: 검색 결과에서 직접 추출한 논문만 저장
+    let realCitations = [];
+    let searchContext = '';
+
+    for (let qi = 0; qi < searchQueries.length; qi++) {
+      const q = searchQueries[qi];
+      // advance loading step visually
+      [1,2,3].forEach(i => {
+        const el = document.getElementById('step' + i);
+        if (el) {
+          el.classList.remove('active');
+          if (i < qi + 1) { el.classList.add('done'); el.querySelector('.step-icon').textContent = '✓'; }
+          if (i === qi + 1) el.classList.add('active');
+        }
+      });
+
+      try {
+        const r1 = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 2000,
+            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+            system: 'You are a biomedical literature retrieval assistant. Search and extract REAL paper information only. Never fabricate.',
+            messages: [{
+              role: 'user',
+              content: `Search PubMed for papers about: ${drugA}, ${drugB}, ${cellLine} cancer.
+
+For each paper found, extract EXACTLY:
+TITLE: [exact title]
+AUTHORS: [authors]
+JOURNAL: [journal name]
+YEAR: [year]
+PMID: [numeric PMID]
+ABSTRACT_SNIPPET: [1-2 sentence summary]
+URL: [pubmed URL]
+
+List up to 3 papers. If you cannot find a real PMID, write PMID: NOT_FOUND. Do NOT invent PMIDs.`
+            }]
+          })
+        });
+        const d1 = await r1.json();
+
+        // collect all text blocks (including tool_result content)
+        let allText = '';
+        for (const block of (d1.content || [])) {
+          if (block.type === 'text') allText += block.text + '\n';
+          if (block.type === 'tool_result') allText += JSON.stringify(block.content) + '\n';
+        }
+        if (allText) searchContext += `\n[Search ${qi+1}: ${drugA}/${drugB}/${cellLine}]\n` + allText;
+
+        // parse structured citations from the text
+        const titleMatches = [...allText.matchAll(/TITLE:\s*(.+)/g)];
+        const authorMatches = [...allText.matchAll(/AUTHORS:\s*(.+)/g)];
+        const journalMatches = [...allText.matchAll(/JOURNAL:\s*(.+)/g)];
+        const yearMatches = [...allText.matchAll(/YEAR:\s*(\d{4})/g)];
+        const pmidMatches = [...allText.matchAll(/PMID:\s*(\d{5,9})/g)];
+        const snippetMatches = [...allText.matchAll(/ABSTRACT_SNIPPET:\s*(.+)/g)];
+
+        for (let i = 0; i < titleMatches.length; i++) {
+          const pmid = pmidMatches[i]?.[1] || null;
+          const title = titleMatches[i]?.[1]?.trim();
+          if (!title || title.length < 10) continue;
+          // dedup by title
+          if (realCitations.some(c => c.title === title)) continue;
+          realCitations.push({
+            title: title,
+            authors: authorMatches[i]?.[1]?.trim() || '',
+            journal: journalMatches[i]?.[1]?.trim() || '',
+            year: yearMatches[i]?.[1]?.trim() || '',
+            pubmed_id: pmid,
+            snippet: snippetMatches[i]?.[1]?.trim() || '',
+            relevance: ''  // will be filled by analysis step
+          });
+        }
+      } catch(e) {
+        console.warn('Search query failed:', q, e);
+      }
+    }
+
+    // step 3 done, step 4 active
+    ['step1','step2','step3'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.classList.remove('active'); el.classList.add('done'); el.querySelector('.step-icon').textContent = '✓'; }
+    });
+    document.getElementById('step4')?.classList.add('active');
+
+    // ── STEP 2: 분석 JSON 생성 — citations 필드 제거, 대신 realCitations 직접 주입 ──
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 5000,
+        system: `You are an expert oncology pharmacologist. ABSOLUTE RULE: output ONLY a raw JSON object. NO backticks, NO markdown, NO code fences. Start with { end with }.
+
+Output this JSON schema (NO citations field - citations are handled separately):
+{
+  "verdict": {"prediction": "SYNERGY"|"ADDITIVE"|"ANTAGONISM"|"UNCERTAIN", "confidence": 0-100, "score_label": "Korean", "summary": "Korean 2-3 sentences"},
+  "mechanism": {
+    "pathway_steps": [{"node": "name", "type": "a"|"b"|"effect"|"neutral", "arrow": "→"}],
+    "key_interaction": "Korean one sentence"
+  },
+  "doses": {
+    "drug_a": [
+      {"label": "IC50 range", "value": "X μM", "note": "Korean", "badge": "primary"},
+      {"label": "조합 테스트", "value": "X μM", "note": "Korean", "badge": "test"},
+      {"label": "Sub-IC50", "value": "X μM", "note": "Korean", "badge": "low"}
+    ],
+    "drug_b": [
+      {"label": "IC50 range", "value": "X nM", "note": "Korean", "badge": "primary"},
+      {"label": "조합 테스트", "value": "X nM", "note": "Korean", "badge": "test"},
+      {"label": "Sub-IC50", "value": "X nM", "note": "Korean", "badge": "low"}
+    ]
+  },
+  "timeline": [
+    {"time": "0 h", "action": "Korean", "desc": "Korean", "type": "normal"|"key"}
+  ],
+  "markers": [
+    {"category": "Korean", "items": [
+      {"name": "γH2AX (pS139)", "kda": "15", "direction": "up"|"down"|"same", "change_desc": "Korean", "confidence": "high"|"medium"|"low", "priority": 1}
+    ]}
+  ],
+  "rationale": "Korean 3-4 sentences",
+  "citation_relevances": ["Korean relevance for citation 0", "Korean relevance for citation 1"],
+  "caveats": [{"type": "warn"|"info", "text": "Korean"}]
+}
+
+RULES: Korean for all user text except protein/drug/journal names. 4-6 marker categories. 5-7 timeline points. 3 doses per drug. citation_relevances array must match number of search results provided.`,
+        messages: [{ role: 'user', content: prompt + (searchContext ? `\n\n=== SEARCH CONTEXT (for mechanism/rationale only) ===\n${searchContext.substring(0, 3000)}` : '') + `\n\nFound ${realCitations.length} real papers from search. Provide citation_relevances array with ${realCitations.length} Korean strings explaining why each paper is relevant.` }]
+      })
+    });
+
+    const data = await response.json();
+    const rawText = data.content.map(b => b.text || '').join('');
+
+    let parsed;
+    try {
+      // 1) strip all code fences (```json ... ``` or ``` ... ```)
+      let clean = rawText.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim();
+
+      // 2) extract the outermost { ... } block
+      const firstBrace = clean.indexOf('{');
+      const lastBrace = clean.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        clean = clean.slice(firstBrace, lastBrace + 1);
+      }
+
+      // 3) attempt direct parse
+      try {
+        parsed = JSON.parse(clean);
+      } catch (_) {
+        // 4) if the response was truncated, close open structures and retry
+        let fixed = clean;
+        // count unclosed braces/brackets
+        let braces = 0, brackets = 0;
+        let inString = false, escape = false;
+        for (const ch of fixed) {
+          if (escape) { escape = false; continue; }
+          if (ch === '\\') { escape = true; continue; }
+          if (ch === '"') { inString = !inString; continue; }
+          if (inString) continue;
+          if (ch === '{') braces++;
+          else if (ch === '}') braces--;
+          else if (ch === '[') brackets++;
+          else if (ch === ']') brackets--;
+        }
+        // remove trailing comma before closing
+        fixed = fixed.replace(/,\s*$/, '');
+        // close any open string
+        if (inString) fixed += '"';
+        // close open brackets and braces
+        for (let i = 0; i < brackets; i++) fixed += ']';
+        for (let i = 0; i < braces; i++) fixed += '}';
+        parsed = JSON.parse(fixed);
+      }
+    } catch (e) {
+      throw new Error('JSON 파싱 실패: ' + e.message + ' | 원문: ' + rawText.substring(0, 300));
+    }
+
+    // finish loading
+    document.getElementById('step4').classList.remove('active');
+    document.getElementById('step4').classList.add('done');
+    document.getElementById('step4').querySelector('.step-icon').textContent = '✓';
+
+    // ── 검색으로 확인된 실제 논문에만 relevance 텍스트 붙여서 주입 ──
+    const relevances = parsed.citation_relevances || [];
+    realCitations = realCitations.map((c, i) => ({
+      ...c,
+      relevance: relevances[i] || '관련 연구'
+    }));
+    // citations는 반드시 검색에서 실제로 찾아진 것만 — 없으면 빈 배열
+    parsed.citations = realCitations;
+
+    setTimeout(() => {
+      document.getElementById('loadingPanel').classList.remove('show');
+      renderResults(parsed, drugA, drugB, cellLine);
+    }, 600);
+
+  } catch (err) {
+    document.getElementById('loadingPanel').classList.remove('show');
+    document.getElementById('errorPanel').classList.add('show');
+    document.getElementById('errorMsg').textContent = '오류: ' + err.message;
+  } finally {
+    document.getElementById('runBtn').disabled = false;
+    // reset loading steps
+    setTimeout(() => {
+      for (let i = 1; i <= 4; i++) {
+        const s = document.getElementById(`step${i}`);
+        s.classList.remove('active', 'done');
+        s.querySelector('.step-icon').textContent = i;
+      }
+      document.getElementById('step1').classList.add('active');
+    }, 800);
+  }
+}
+
+function buildPrompt(drugA, drugB, cellLine, purpose, ic50Info, notes) {
+  return `Analyze drug combination for preclinical WB experiment:
+
+Drug A: ${drugA}
+Drug B: ${drugB}
+Cell line: ${cellLine}
+Purpose: ${purpose}
+${ic50Info ? `Known IC50: ${ic50Info}` : ''}
+${notes ? `Notes: ${notes}` : ''}
+
+Please predict:
+1. Whether this combination will show SYNERGY, ADDITIVE, ANTAGONISM, or UNCERTAIN effect
+2. The mechanistic pathway connecting both drugs
+3. Recommended dose ranges for each drug (3 levels: IC50 range, combination testing dose, sub-IC50)
+4. Experimental timeline with key time points
+5. Western blot markers to check, organized by category with expected direction changes
+6. Key literature references with PubMed IDs where available
+7. Important caveats (especially if no direct data exists for this cell line)
+
+Base your predictions on:
+- Known genomic features of ${cellLine} (mutations, copy number variants)
+- Published pharmacology of ${drugA} and ${drugB}
+- Known pathway interactions
+- Similar cell lines if ${cellLine}-specific data is lacking`;
+}
+
+function renderResults(data, drugA, drugB, cellLine) {
+  const res = document.getElementById('results');
+  res.style.display = 'block';
+
+  const verdictClass = {
+    'SYNERGY': 'synergy', 'ADDITIVE': 'additive',
+    'ANTAGONISM': 'antagonism', 'UNCERTAIN': 'uncertain'
+  }[data.verdict?.prediction] || 'uncertain';
+
+  const verdictColor = {
+    'synergy': '#00d9c0', 'additive': '#f5a623',
+    'antagonism': '#ff4d6d', 'uncertain': '#7d8fa8'
+  }[verdictClass];
+
+  const conf = data.verdict?.confidence || 0;
+  const circ = 2 * Math.PI * 30;
+  const dashOffset = circ * (1 - conf / 100);
+
+  // markers HTML
+  const markersHTML = (data.markers || []).map(cat => `
+    <div class="marker-category">${cat.category}</div>
+    ${(cat.items || []).map(m => {
+      const dir = m.direction === 'up' ? '↑' : m.direction === 'down' ? '↓' : '—';
+      const arrowClass = m.direction === 'up' ? 'arrow-up' : m.direction === 'down' ? 'arrow-down' : 'arrow-same';
+      const confClass = m.confidence === 'high' ? 'conf-h' : m.confidence === 'medium' ? 'conf-m' : 'conf-l';
+      const confLabel = m.confidence === 'high' ? 'HIGH' : m.confidence === 'medium' ? 'MED' : 'LOW';
+      return `<div class="marker-row">
+        <span class="marker-name">${m.name || ''}</span>
+        <span class="marker-kda">${m.kda ? m.kda + ' kDa' : ''}</span>
+        <div class="marker-change">
+          <span class="change-arrow ${arrowClass}">${dir}</span>
+          <span class="change-text">${m.change_desc || ''}</span>
+        </div>
+        <span class="marker-conf ${confClass}">${confLabel}</span>
+      </div>`;
+    }).join('')}
+  `).join('');
+
+  // timeline HTML
+  const tlHTML = (data.timeline || []).map((t, i) => {
+    const dotClass = t.type === 'key' ? 'key' : i === 0 ? 'active' : '';
+    return `<div class="tl-item">
+      <div class="tl-left">
+        <div class="tl-dot ${dotClass}"></div>
+        <div class="tl-line"></div>
+      </div>
+      <span class="tl-time">${t.time}</span>
+      <div class="tl-body">
+        <div class="tl-action">${t.action}</div>
+        <div class="tl-desc">${t.desc}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // dose table HTML
+  const doseTableA = doseTable(data.doses?.drug_a || [], drugA);
+  const doseTableB = doseTable(data.doses?.drug_b || [], drugB);
+
+  // citations HTML
+  const citesHTML = (data.citations || []).map((c, i) => {
+    // pubmed_id가 실제 숫자인 경우에만 링크 생성
+    const pmidNum = c.pubmed_id && /^\d{5,9}$/.test(String(c.pubmed_id).trim());
+    const pmLink = pmidNum
+      ? `<a class="cite-link" href="https://pubmed.ncbi.nlm.nih.gov/${c.pubmed_id}" target="_blank">PubMed ↗ PMID:${c.pubmed_id}</a>`
+      : `<span style="font-family:var(--font-mono);font-size:10px;color:var(--text3)">PMID 미확인</span>`;
+    const journalLine = [c.journal, c.year].filter(Boolean).join(', ');
+    return `<div class="cite-item">
+      <div class="cite-num">[${i + 1}]</div>
+      <div class="cite-body">
+        <div class="cite-title">${c.title}</div>
+        ${journalLine ? `<div class="cite-meta">${journalLine}</div>` : ''}
+        ${c.authors ? `<div class="cite-meta" style="color:var(--text3)">${c.authors}</div>` : ''}
+        <div class="cite-meta" style="color:var(--text2); margin-top:2px">${c.relevance}</div>
+        ${pmLink}
+      </div>
+    </div>`;
+  }).join('');
+
+  // caveats HTML
+  const caveatsHTML = (data.caveats || []).map(c =>
+    `<div class="caveat-item ${c.type}">
+      <span class="caveat-icon">${c.type === 'warn' ? '⚠' : 'ℹ'}</span>
+      <span>${c.text}</span>
+    </div>`
+  ).join('');
+
+  // mechanism HTML
+  let mechHTML = '';
+  if (data.mechanism?.pathway_steps) {
+    mechHTML = data.mechanism.pathway_steps.map(step => {
+      const nodeClass = step.type === 'a' ? 'node-a' : step.type === 'b' ? 'node-b' : step.type === 'effect' ? 'node-effect' : 'node-neutral';
+      return `<span class="node ${nodeClass}">${step.node}</span><span class="arrow-flow">${step.arrow || '→'}</span>`;
+    }).join('') + `<br><br><span style="color:var(--text)">${data.mechanism.key_interaction || ''}</span>`;
+  }
+
+  res.innerHTML = `
+    <!-- VERDICT BANNER -->
+    <div class="verdict-banner ${verdictClass}">
+      <div class="verdict-score-ring">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="30" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="5"/>
+          <circle cx="40" cy="40" r="30" fill="none" stroke="${verdictColor}" stroke-width="5"
+            stroke-dasharray="${circ}" stroke-dashoffset="${dashOffset}"
+            stroke-linecap="round"/>
+        </svg>
+        <div class="score-text" style="color:${verdictColor}">${conf}%</div>
+      </div>
+      <div class="verdict-info">
+        <div class="verdict-label" style="color:${verdictColor}">${data.verdict?.prediction || ''} PREDICTION</div>
+        <div class="verdict-title">${data.verdict?.score_label || ''}</div>
+        <div class="verdict-sub">${data.verdict?.summary || ''}</div>
+      </div>
+    </div>
+
+    <!-- MECHANISM + RATIONALE -->
+    <div class="results-grid full" style="animation: fadeSlideIn 0.5s ease 0.05s both">
+      <div class="res-card">
+        <div class="res-card-title"><span class="tag-dot"></span>작용 기전 (Mechanistic Pathway)</div>
+        <div class="pathway-text">${mechHTML}</div>
+        ${data.rationale ? `<div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border); font-family:var(--font-mono); font-size:12px; color:var(--text2); line-height:1.7">${data.rationale}</div>` : ''}
+      </div>
+    </div>
+
+    <!-- DOSES + TIMELINE -->
+    <div class="results-grid" style="animation: fadeSlideIn 0.5s ease 0.1s both">
+      <div class="res-card">
+        <div class="res-card-title"><span class="tag-dot"></span>추천 농도 범위</div>
+        <div style="margin-bottom:16px">
+          <div style="font-family:var(--font-mono); font-size:10px; color:var(--text2); margin-bottom:8px; letter-spacing:1px; text-transform:uppercase">▸ ${drugA}</div>
+          ${doseTableA}
+        </div>
+        <div>
+          <div style="font-family:var(--font-mono); font-size:10px; color:var(--amber); margin-bottom:8px; letter-spacing:1px; text-transform:uppercase">▸ ${drugB}</div>
+          ${doseTableB}
+        </div>
+      </div>
+      <div class="res-card">
+        <div class="res-card-title"><span class="tag-dot amber"></span>실험 타임라인</div>
+        <div class="timeline">${tlHTML}</div>
+      </div>
+    </div>
+
+    <!-- WB MARKERS -->
+    <div class="results-grid full" style="animation: fadeSlideIn 0.5s ease 0.15s both">
+      <div class="res-card">
+        <div class="res-card-title"><span class="tag-dot rose"></span>Western Blot 확인 마커 (우선순위 순)</div>
+        <div style="margin-bottom:8px; display:flex; gap:16px; font-family:var(--font-mono); font-size:10px; color:var(--text3)">
+          <span>↑ 증가예상</span>
+          <span style="color:var(--rose)">↓ 감소예상</span>
+          <span>— 변화없음/관찰</span>
+          <span style="margin-left:auto">HIGH = 논문직접근거 / MED = 유사조건 / LOW = 기전추론</span>
+        </div>
+        <div class="marker-list">${markersHTML}</div>
+      </div>
+    </div>
+
+    <!-- CITATIONS + CAVEATS -->
+    <div class="results-grid" style="animation: fadeSlideIn 0.5s ease 0.2s both">
+      <div class="res-card">
+        <div class="res-card-title"><span class="tag-dot"></span>근거 논문</div>
+        <div class="citations">${citesHTML || '<div style="font-family:var(--font-mono); font-size:12px; color:var(--text3); padding:8px; border:1px solid var(--border); border-radius:6px">⚠ 실제 논문을 찾지 못했습니다. 검색 결과가 없거나 신약이라 논문이 없을 수 있습니다.</div>'}</div>
+      </div>
+      <div class="res-card">
+        <div class="res-card-title"><span class="tag-dot amber"></span>주의사항 & 한계</div>
+        <div class="caveat-list">${caveatsHTML || '<div style="font-family:var(--font-mono); font-size:11px; color:var(--text3)">특이사항 없음</div>'}</div>
+      </div>
+    </div>
+  `;
+
+  res.classList.add('show');
+  res.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function doseTable(doses, drugName) {
+  if (!doses?.length) return '<div style="font-family:var(--font-mono); font-size:11px; color:var(--text3)">데이터 없음</div>';
+  return `<table class="dose-table">
+    <thead><tr>
+      <th>레벨</th><th>농도</th><th>비고</th>
+    </tr></thead>
+    <tbody>
+      ${doses.map(d => `<tr>
+        <td><span class="dose-badge badge-${d.badge || 'test'}">${d.label}</span></td>
+        <td class="dose-val">${d.value}</td>
+        <td><div class="dose-note">${d.note}</div></td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+</script>
+</body>
+</html>
